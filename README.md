@@ -1,5 +1,5 @@
 # HEVA_Portal
-VMC protocol implementation for Blender for VTubers. Supports animation and sound recording. Works with both [HEVA](https://github.com/scaledteam/HEVA) and [VSeeFace](https://www.vseeface.icu/). Also supports animation creating and sound recording + synchronization of both.
+VMC protocol implementation for Blender for VTubers. Supports animation and sound recording. Works with both [HEVA](https://github.com/scaledteam/HEVA) and [VSeeFace](https://www.vseeface.icu/). Also supports animation creating and sound recording + synchronization of both. Tested on Blender 3.6.2.
 
 [RUS] Дополнительную информацию на русском языке можно найти на стриме: https://www.youtube.com/watch?v=4X-1wE6MlDc
 
