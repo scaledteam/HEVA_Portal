@@ -8,8 +8,9 @@
 
 ARMATURE_NAME = 'Girl_HEVA'
 FACE_NAME = 'Girl_Body'
-PORT = 9000 
+PORT = 9000
 CAPTURE_FRAMERATE = 30
+AUDIO_ENABLE = False
 
 # Just code
 
@@ -22,8 +23,9 @@ from threading import Thread
 from time import perf_counter,sleep
 from mathutils import Vector,Quaternion
 
-import pyaudio
-import wave
+if AUDIO_ENABLE:
+    import pyaudio
+    import wave
 
 import datetime
 
@@ -44,12 +46,16 @@ player_values = object_face.key_blocks
 
 # Audio settings
 CHUNK = 1024
-FORMAT = pyaudio.paInt16
+FORMAT = None
+if AUDIO_ENABLE:
+    FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 48000
 
 # Sound varriables
-p = pyaudio.PyAudio()
+p = None
+if AUDIO_ENABLE:
+    p = pyaudio.PyAudio()
 stream = None
 frames = []
 
@@ -123,7 +129,7 @@ bones_to_apply3_list = list(bones_to_apply3)
 def heva_receiver_set_pos(address, *args):
     global bones_to_send
     global bones_to_apply1
-    
+
     bone_name = args[0]
     if bone_name in bones_to_apply1:
         bones_to_apply1[bone_name][0][0] = args[1]
@@ -178,7 +184,7 @@ def init_osc_server():
     except OSError:
         ShowMessageBox("OSC Server Not started", icon='ERROR')
         return False
-    
+
 
 def capture_start():
     global capture
@@ -192,7 +198,7 @@ def capture_start():
     global co
     global objects_capture_last_frame
     global objects_capture_ready
-    
+
     global CHUNK
     global FORMAT
     global CHANNELS
@@ -203,37 +209,37 @@ def capture_start():
     global frames
     capture_start_frame = bpy.context.scene.frame_current
     local_frame_current = bpy.context.scene.frame_current / FRAMERATE
-    
+
     time_previous = perf_counter()
-    
+
     for object in {object_body, object_face}:
         if object.animation_data and object.animation_data.nla_tracks:
             for nla_track in object.animation_data.nla_tracks:
                 nla_track.mute=True
-    
-    stream = p.open(format=FORMAT,
-        channels=CHANNELS,
-        rate=RATE,
-        input=True,
-        frames_per_buffer=CHUNK)
-    
+    if AUDIO_ENABLE:
+        stream = p.open(format=FORMAT,
+            channels=CHANNELS,
+            rate=RATE,
+            input=True,
+            frames_per_buffer=CHUNK)
+
     action_name = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-            
+
     for bone_name in bones_to_apply1_list:
         bone = bones_to_send[bone_name]
-        d
+
         bone.keyframe_insert('location')
         bone.keyframe_insert('rotation_quaternion')
-        
+
         rig_action = object_body.animation_data.action
         for fcurve in rig_action.fcurves:
             fcurve.mute = True
-    
+
     for bone_name in bones_to_apply3_list:
         bone = bones_to_send[bone_name]
-        
+
         bone.keyframe_insert('value')
-        
+
         rig_action = object_face.animation_data.action
         for fcurve in rig_action.fcurves:
             fcurve.mute = True
@@ -250,7 +256,7 @@ def capture_stop():
     global co
     global objects_capture_last_frame
     global objects_capture_ready
-    
+
     global CHUNK
     global FORMAT
     global CHANNELS
@@ -266,10 +272,10 @@ def capture_stop():
             rig_action.name = action_name + ' ' + object.name
             #for fcurve in rig_action.fcurves:
             #    fcurve.mute = False
-            
+
             for fcurve in rig_action.fcurves:
                 fcurve.mute = False
-            
+
             strip = None
             try:
                 strip = object.animation_data.nla_tracks.active.strips.new(action_name, capture_start_frame, rig_action)
@@ -279,28 +285,29 @@ def capture_stop():
                 except:
                     object.animation_data.nla_tracks.new()
                     strip = object.animation_data.nla_tracks.active.strips.new(action_name, capture_start_frame, rig_action)
-            
+
             object.animation_data.action = None
             strip.extrapolation='NOTHING'
             for nla_track in object.animation_data.nla_tracks:
                 nla_track.mute=False
-    
+
     #this_frame = int(local_frame_current * FRAMERATE + 1)
     #bpy.context.scene.frame_current = this_frame
-    
-    stream.stop_stream()
-    stream.close()
 
-    filename = '//' + action_name + '.wav'
-    wf = wave.open(bpy.path.abspath(filename), 'wb')
-    wf.setnchannels(CHANNELS)
-    wf.setsampwidth(p.get_sample_size(FORMAT))
-    wf.setframerate(RATE)
-    wf.writeframes(b''.join(frames))
-    wf.close()
-    frames.clear()
-    bpy.context.scene.sequence_editor.sequences.new_sound(action_name, filename, 1, capture_start_frame)
-    
+    if AUDIO_ENABLE:
+        stream.stop_stream()
+        stream.close()
+
+        filename = '//' + action_name + '.wav'
+        wf = wave.open(bpy.path.abspath(filename), 'wb')
+        wf.setnchannels(CHANNELS)
+        wf.setsampwidth(p.get_sample_size(FORMAT))
+        wf.setframerate(RATE)
+        wf.writeframes(b''.join(frames))
+        wf.close()
+        frames.clear()
+        bpy.context.scene.sequence_editor.sequences.new_sound(action_name, filename, 1, capture_start_frame)
+
 
 
 class ModalTimerOperator(bpy.types.Operator):
@@ -316,7 +323,7 @@ class ModalTimerOperator(bpy.types.Operator):
         self._timer = wm.event_timer_add(0.5/CAPTURE_FRAMERATE, window=context.window)
         wm.modal_handler_add(self)
         return {'RUNNING_MODAL'}
-    
+
     def modal(self, context, event):
         global capture
         global capture_frame
@@ -329,7 +336,7 @@ class ModalTimerOperator(bpy.types.Operator):
         global co
         global objects_capture_last_frame
         global objects_capture_ready
-        
+
         global CHUNK
         global FORMAT
         global CHANNELS
@@ -338,97 +345,99 @@ class ModalTimerOperator(bpy.types.Operator):
         global p
         global stream
         global frames
-            
+
         local_frame_current += perf_counter() - time_previous
         time_previous = perf_counter()
-        
+
         if event.value == 'RELEASE':
             if event.type == 'ESC':
                 self.cancel(context)
                 return {'CANCELLED'}
             elif event.type == 'F1':
-                
+
                 capture = not capture
-                
+
                 if capture:
                     capture_start()
                 else:
                     capture_stop()
-        
-        
+
+
         #this_frame = int(local_frame_current * FRAMERATE + 1)
         #bpy.context.scene.frame_current = this_frame
-        
+
         if objects_capture_ready:
             objects_capture_ready = False
-            
+
             for bone_name in bones_to_apply1_list:
                 bone = bones_to_send[bone_name]
                 bone.location = bones_to_apply1[bone_name][0]
                 bone.rotation_quaternion = bones_to_apply1[bone_name][1]
-            
+
             for bone_name in bones_to_apply3_list:
                 bone = bones_to_send[bone_name]
                 bone.value = bones_to_apply3[bone_name]
-            
+
             if capture:
                 this_frame = int(local_frame_current * FRAMERATE + 1)
-                
+
                 #data = stream.read(CHUNK)
                 #frames.append(data)
-                data_frames = stream.get_read_available()
-                if data_frames:
-                    data = stream.read(data_frames)
-                    frames.append(data)
-                
+                if AUDIO_ENABLE:
+                    data_frames = stream.get_read_available()
+                    if data_frames:
+                        data = stream.read(data_frames)
+                        frames.append(data)
+
                 if this_frame > objects_capture_last_frame:
                     objects_capture_last_frame = this_frame
-                    
+
                     ## Animation engine
                     delta_time = perf_counter() - time_previous
                     time_previous = perf_counter()
-                    
+
                     local_frame_current += delta_time
-                    
+
                     #capture_frame += 1
                     co[0] = local_frame_current * FRAMERATE
-                    
+
                     for object in {object_body, object_face}:
                         if object.animation_data and object.animation_data.action:
                             object_fcurves = object.animation_data.action.fcurves
-                            
+
                             for fcurve in object_fcurves:
                                 try:
                                     co[1] = object.path_resolve(fcurve.data_path)[fcurve.array_index]
                                 except:
                                     co[1] = object.path_resolve(fcurve.data_path)
-                                
+
                                 capture_frame = len(fcurve.keyframe_points)
                                 fcurve.keyframe_points.add(1)
                                 fcurve.keyframe_points[capture_frame].co = co
                                 fcurve.keyframe_points[capture_frame].handle_left = co
                                 fcurve.keyframe_points[capture_frame].handle_right = co
-                
+
                 #bpy.context.scene.frame_current = int(local_frame_current * FRAMERATE + 1)
                 #bpy.context.scene.frame_set(int(local_frame_current * FRAMERATE + 1))
                 #bpy.context.scene.frame_current = int(local_frame_current * FRAMERATE + 1)
                 bpy.context.scene.frame_current = this_frame
-        
+
         return {'PASS_THROUGH'}
-    
+
     def cancel(self, context):
         if capture:
             capture_stop()
-        
+
         global heva_receiver
         if self._timer:
             wm = context.window_manager
             wm.event_timer_remove(self._timer)
-            
+
         heva_receiver.shutdown()
         heva_receiver.server_close()
 
-        p.terminate()
+        if AUDIO_ENABLE:
+            p.terminate()
         ShowMessageBox("Program terminated successfully!")
 
 def register():
@@ -438,9 +447,8 @@ def unregister():
     bpy.utils.unregister_class(ModalTimerOperator)
 
 if __name__ == "__main__":
-    
+
     if init_osc_server():
         register()
         bpy.ops.wm.modal_timer_operator()
         ShowMessageBox("Program is running! Yay!")
-
